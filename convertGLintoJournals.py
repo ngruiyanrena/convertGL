@@ -52,7 +52,8 @@ def process_GL(GL_file, COA_file):
     GL_cleaned[['Debit', 'Credit']] = GL_cleaned.apply(debit_credit, axis=1)
 
     GL_cleaned.sort_values(by=['No.'], key=lambda x: x.map(alphanumeric_key), ascending=True, inplace=True)
-    
+    GL_cleaned = GL_cleaned.reset_index()
+
     output_df = pd.DataFrame({
         "Journal Reference": GL_cleaned['No.'],
         "Contact": GL_cleaned['Name'],
