@@ -27,21 +27,24 @@ def alphanumeric_key(s):
     s = str(s)
     return (0, [int(text) if text.isdigit() else text.lower() for text in re.split('([0-9]+)', s)])
 
-def process_GL(GL_file, prepCOA_file):
+def process_GL(GL_file, COA_file):
     GL_data = pd.read_excel(GL_file, header=4)
     GL_cleaned = GL_data.rename(columns={ GL_data.columns[0]: "Account" })
     GL_cleaned['Account'].ffill(inplace=True)
     GL_cleaned.dropna(subset=['Transaction Type'], inplace=True)
     GL_cleaned[['Account Code', 'Account Name']] = GL_cleaned['Account'].str.extract(r'(?:(\d+(?:\.\d+)*)\s+)?(.*)')
-    GL_cleaned['Account Code'] = GL_cleaned['Account Code'].astype(str)
     GL_cleaned['Account Name'] = GL_cleaned['Account Name'].astype(str)
+    GL_cleaned['Account Name'] = GL_cleaned['Account Name'].apply(
+        lambda x: re.sub(r' - .+$', '', x) if x.startswith('Trade and other payables') else x
+    )
 
-    prepCOA_data = pd.read_csv(prepCOA_file, header=0)
-    prepCOA_cleaned = prepCOA_data[['Account Type', 'Account Name', 'Account Code']]
-    prepCOA_cleaned['Account Code'] = prepCOA_cleaned['Account Code'].astype(str)
-    prepCOA_cleaned['Account Name'] = prepCOA_cleaned['Account Name'].astype(str)
+    COA_data = pd.read_excel(COA_file, sheet_name="Chart of Accounts", header=0, dtype=str)
+    COA_cleaned = COA_data[['Account Type*', 'Name*', 'Code']]
+    COA_cleaned.rename(columns={'Account Type*': 'Account Type'}, inplace=True)
+    COA_cleaned.rename(columns={'Name*': 'Account Name'}, inplace=True)
+    COA_cleaned.rename(columns={'Code': 'Account Code'}, inplace=True)
 
-    GL_cleaned = GL_cleaned.merge(prepCOA_cleaned, 
+    GL_cleaned = GL_cleaned.merge(COA_cleaned, 
                                   on=['Account Name'], 
                                   how='left')
     
@@ -78,10 +81,10 @@ def main():
     st.title('Convert GL into Import Journals')
 
     GL_file = st.file_uploader("Upload General Ledger", type=['xlsx'])
-    prepCOA_file = st.file_uploader("Upload prepCOA", type=['csv'])
+    COA_file = st.file_uploader("Upload COA Import", type=['xlsx'])
 
-    if GL_file and prepCOA_file is not None:
-        processed_data = process_GL(GL_file, prepCOA_file)
+    if GL_file and COA_file is not None:
+        processed_data = process_GL(GL_file, COA_file)
         st.write("Processed Data", processed_data)
         csv = convert_df_to_csv(processed_data)
         st.download_button(
